@@ -43,7 +43,7 @@ export const unpkgPathPlugin = () => {
           return {
             loader: "jsx",
             contents: `
-              import React from 'react@16.0.0';
+              import React from 'react';
               console.log(message);
             `,
           };
