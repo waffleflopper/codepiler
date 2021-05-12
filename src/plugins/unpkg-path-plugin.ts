@@ -1,5 +1,10 @@
 import * as esbuild from "esbuild-wasm";
 import axios from "axios";
+import localforage from "localforage";
+
+const fileCache = localforage.createInstance({
+  name: "filecache",
+});
 
 const packageCDN = "https://unpkg.com";
 
@@ -28,6 +33,7 @@ export const unpkgPathPlugin = () => {
         };
       });
 
+      //onload
       build.onLoad({ filter: /.*/ }, async (args: any) => {
         console.log("onLoad", args);
 
@@ -37,19 +43,34 @@ export const unpkgPathPlugin = () => {
           return {
             loader: "jsx",
             contents: `
-              const message = require('@stitches/react')
+              import React from 'react@16.0.0';
               console.log(message);
             `,
           };
         }
 
+        //have we fetched this file?
+        const cachedResult = await fileCache.getItem<esbuild.OnLoadResult>(
+          args.path
+        );
+        //is it in cache?
+        if (cachedResult) {
+          return cachedResult;
+        }
+
         //fetching from unpkg.com
         const { data, request } = await axios.get(args.path);
-        return {
+
+        const result: esbuild.OnLoadResult = {
           loader: "jsx",
           contents: data,
           resolveDir: new URL("./", request.responseURL).pathname, //ensures packages nested in directories are properly resolved
         };
+
+        //cache it
+        await fileCache.setItem(args.path, result);
+
+        return result;
       });
     },
   };
