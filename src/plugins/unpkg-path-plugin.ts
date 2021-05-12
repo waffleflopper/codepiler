@@ -8,25 +8,26 @@ const fileCache = localforage.createInstance({
 
 const packageCDN = "https://unpkg.com";
 
-export const unpkgPathPlugin = () => {
+export const unpkgPathPlugin = (inputCode: string) => {
   return {
     name: "unpkg-path-plugin",
     setup(build: esbuild.PluginBuild) {
+      //base "index.js" (user input textarea)
+      build.onResolve({ filter: /(^index\.js$)/ }, () => {
+        return { path: "index.js", namespace: "a" };
+      });
+
+      //relative imports inside imports (imports inside the packages imported in textarea)
+      build.onResolve({ filter: /^\.+\// }, async (args: any) => {
+        //importing relative paths inside other imports (./ and ../)
+        return {
+          namespace: "a",
+          path: new URL(args.path, packageCDN + args.resolveDir + "/").href,
+        };
+      });
+
+      //root packages (imports inside the textarea)
       build.onResolve({ filter: /.*/ }, async (args: any) => {
-        console.log("onResolve", args);
-        if (args.path === "index.js") {
-          return { path: args.path, namespace: "a" };
-        }
-
-        //for recursive importing via unpkg.
-        if (args.path.includes("./") || args.path.includes("../")) {
-          return {
-            namespace: "a",
-            path: new URL(args.path, packageCDN + args.resolveDir + "/").href,
-          };
-          //args.importer is the file making the call which allows proper url construction for nested imports
-        }
-
         return {
           namespace: "a",
           path: `${packageCDN}/${args.path}`,
@@ -42,10 +43,7 @@ export const unpkgPathPlugin = () => {
         if (args.path === "index.js") {
           return {
             loader: "jsx",
-            contents: `
-              import React from 'react';
-              console.log(message);
-            `,
+            contents: inputCode,
           };
         }
 
